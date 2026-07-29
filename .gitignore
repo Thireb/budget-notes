@@ -1,0 +1,39 @@
+# Built artifacts / Gradle
+.gradle/
+.gradle-home/
+.wrapper-gen/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+dist/
+
+# Local SDK / machine config
+local.properties
+
+# Release signing (never commit secrets or keystores)
+keystore.properties
+keystore/
+*.jks
+*.keystore
+*.p12
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+*.swp
+*~
+
+# Kotlin / Android Studio
+.kotlin/
+*.hprof
+*.log
+
+# Optional local tooling
+.wrapper-gen/
