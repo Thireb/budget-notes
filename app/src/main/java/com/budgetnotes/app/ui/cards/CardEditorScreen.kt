@@ -45,22 +45,27 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
@@ -74,10 +79,16 @@ import com.budgetnotes.app.BudgetNotesApplication
 import com.budgetnotes.app.data.CardImageStore
 import com.budgetnotes.app.data.CardType
 import com.budgetnotes.app.ui.capture.InAppCardCamera
+import com.budgetnotes.app.ui.theme.RedNegative
+import com.budgetnotes.app.util.CardExpiry
+import com.budgetnotes.app.util.ExpiryStatus
 import java.io.File
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,10 +109,15 @@ fun CardEditorScreen(
     var cameraOutputFile by remember { mutableStateOf<File?>(null) }
     var showAddFieldDialog by remember { mutableStateOf(false) }
     var newFieldName by remember { mutableStateOf("") }
+    var checkoutJob by remember { mutableStateOf<Job?>(null) }
 
     val cardType = state.cardType
     val runOcr = cardType == CardType.PAYMENT || cardType == CardType.ID
     val imageStore = rememberImageStore(context)
+
+    DisposableEffect(Unit) {
+        onDispose { checkoutJob?.cancel() }
+    }
 
     fun openInAppCamera(side: CardImageStore.ImageSide) {
         imagePickSide = side
@@ -300,6 +316,16 @@ fun CardEditorScreen(
                             state = state,
                             viewModel = viewModel,
                             context = context,
+                            onCopyForCheckout = {
+                                checkoutJob?.cancel()
+                                checkoutJob = scope.launch {
+                                    runCheckoutCopy(
+                                        context = context,
+                                        state = state,
+                                        snackbarHostState = snackbarHostState,
+                                    )
+                                }
+                            },
                         )
                         CardType.ID -> IdFields(
                             state = state,
@@ -471,13 +497,79 @@ private fun CardImageSlot(
     }
 }
 
+private val ExpiringSoonAmber = Color(0xFFE65100)
+private const val CHECKOUT_STEP_DELAY_MS = 8_000L
+
+@Composable
+private fun ExpiryStatusBanner(status: ExpiryStatus) {
+    val label = CardExpiry.chipLabel(status) ?: return
+    val color = when (status) {
+        ExpiryStatus.EXPIRED -> RedNegative
+        ExpiryStatus.EXPIRING_SOON -> ExpiringSoonAmber
+        else -> return
+    }
+    Surface(
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = when (status) {
+                ExpiryStatus.EXPIRED -> "$label — update or replace this card"
+                ExpiryStatus.EXPIRING_SOON -> "$label — expires within ${CardExpiry.WARN_WITHIN_DAYS} days"
+                else -> label
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = color,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        )
+    }
+}
+
+private suspend fun runCheckoutCopy(
+    context: Context,
+    state: CardEditorUiState,
+    snackbarHostState: SnackbarHostState,
+) = coroutineScope {
+    val pan = state.cardNumber.filter { it.isDigit() }
+    val expiry = listOf(state.expiryMonth, state.expiryYear.takeLast(2))
+        .filter { it.isNotBlank() }
+        .joinToString("/")
+    val steps = buildList {
+        if (pan.isNotBlank()) add("Number copied — paste now" to ("Card number" to pan))
+        if (expiry.isNotBlank()) add("Expiry copied — paste now" to ("Expiry" to expiry))
+        if (state.cvv.isNotBlank()) add("CVV copied — paste now" to ("CVV" to state.cvv))
+    }
+    if (steps.isEmpty()) {
+        snackbarHostState.showSnackbar("Nothing to copy")
+        return@coroutineScope
+    }
+    steps.forEachIndexed { index, (message, labeledValue) ->
+        val (clipLabel, value) = labeledValue
+        copyToClipboard(context, clipLabel, value)
+        // Don't await snackbar dismiss — keep an 8s clipboard cadence.
+        launch { snackbarHostState.showSnackbar(message) }
+        if (index < steps.lastIndex) {
+            delay(CHECKOUT_STEP_DELAY_MS)
+        }
+    }
+}
+
 @Composable
 private fun PaymentFields(
     state: CardEditorUiState,
     viewModel: CardEditorViewModel,
     context: Context,
+    onCopyForCheckout: () -> Unit,
 ) {
+    val expiryStatus = CardExpiry.statusForPayment(state.expiryMonth, state.expiryYear)
+    ExpiryStatusBanner(expiryStatus)
     Text("Payment details", style = MaterialTheme.typography.titleMedium)
+    TextButton(onClick = onCopyForCheckout) {
+        Icon(Icons.Default.ContentCopy, contentDescription = null)
+        Text("  Copy for checkout")
+    }
     CopyableField(
         label = "Card number",
         value = state.cardNumber,
@@ -579,6 +671,8 @@ private fun IdFields(
     context: Context,
     onAddCustomField: () -> Unit,
 ) {
+    val expiryStatus = CardExpiry.statusForIdDate(state.expiryDate)
+    ExpiryStatusBanner(expiryStatus)
     Text("ID details", style = MaterialTheme.typography.titleMedium)
     CopyableField(
         label = "Full name",
