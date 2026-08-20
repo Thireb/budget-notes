@@ -8,4 +8,10 @@ class Converters {
 
     @TypeConverter
     fun toBudgetItemType(value: String): BudgetItemType = BudgetItemType.valueOf(value)
+
+    @TypeConverter
+    fun fromCardType(value: CardType): String = value.name
+
+    @TypeConverter
+    fun toCardType(value: String): CardType = CardType.valueOf(value)
 }

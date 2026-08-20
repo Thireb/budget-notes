@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <include domain="database" />
+    <!-- Budget notes may back up; cards.db holds PAN/CVV — never cloud-back up. -->
+    <include domain="database" path="budget_notes.db" />
     <include domain="sharedpref" />
+    <exclude domain="database" path="cards.db" />
+    <exclude domain="database" path="cards.db-shm" />
+    <exclude domain="database" path="cards.db-wal" />
+    <exclude domain="file" path="cards" />
 </full-backup-content>

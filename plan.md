@@ -168,6 +168,7 @@ app/
 8. **New note creation + delete note**: FAB creates note, long-press-to-delete on home grid.
 9. **Polish**: dark mode, empty states, currency formatting, animations (Compose's default AnimatedVisibility for section changes).
 10. **(Future, not v1)**: cloud sync, backup/export, note colors, search, widgets.
+11. **Cards vault**: see [docs/SPEC_CARDS.md](docs/SPEC_CARDS.md) — Notes | Cards bottom tabs, payment/ID cards with photos + OCR, encryption Phase 2.
 
 ---
 

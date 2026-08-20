@@ -17,3 +17,11 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+-keepclassmembers enum com.budgetnotes.app.data.CardType {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+# ML Kit
+-dontwarn com.google.mlkit.**
+-keep class com.google.mlkit.** { *; }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- App-private files only; never external/DCIM/gallery paths. -->
+    <files-path name="card_images" path="cards/" />
+    <cache-path name="card_capture_cache" path="card_capture/" />
+</paths>
