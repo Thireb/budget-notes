@@ -29,4 +29,9 @@ interface CardCustomFieldDao {
 
     @Query("SELECT * FROM card_custom_fields WHERE id = :id")
     suspend fun getById(id: Long): CardCustomField?
+
+    @Query(
+        "SELECT * FROM card_custom_fields WHERE cardId = :cardId ORDER BY position ASC, id ASC",
+    )
+    suspend fun getForCardOnce(cardId: Long): List<CardCustomField>
 }

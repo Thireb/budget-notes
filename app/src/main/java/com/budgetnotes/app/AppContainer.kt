@@ -6,22 +6,55 @@ import com.budgetnotes.app.data.CardsDatabase
 import com.budgetnotes.app.ocr.CardOcrHelper
 import com.budgetnotes.app.repository.BudgetNoteRepository
 import com.budgetnotes.app.repository.CardRepository
+import com.budgetnotes.app.security.SecureClipboard
+import com.budgetnotes.app.security.SecureDatabaseFactory
+import com.budgetnotes.app.security.VaultCrypto
+import com.budgetnotes.app.security.VaultLockManager
+import com.budgetnotes.app.security.VaultMigration
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-class AppContainer(application: BudgetNotesApplication) {
-    private val database = AppDatabase.getInstance(application)
-    private val cardsDatabase = CardsDatabase.getInstance(application)
-    val imageStore = CardImageStore(application)
-    /** Shared OCR client — creating TextRecognizer per editor open is expensive. */
+class AppContainer(private val application: BudgetNotesApplication) {
+    val lockManager = VaultLockManager(application)
+    val clipboard = SecureClipboard(application)
     val ocrHelper = CardOcrHelper(application)
 
-    val repository = BudgetNoteRepository(
-        noteDao = database.budgetNoteDao(),
-        itemDao = database.budgetItemDao(),
-    )
+    @Volatile
+    private var unlocked = false
 
-    val cardRepository = CardRepository(
-        cardDao = cardsDatabase.savedCardDao(),
-        fieldDao = cardsDatabase.cardCustomFieldDao(),
-        imageStore = imageStore,
-    )
+    lateinit var imageStore: CardImageStore
+        private set
+    lateinit var repository: BudgetNoteRepository
+        private set
+    lateinit var cardRepository: CardRepository
+        private set
+
+    val isUnlocked: Boolean get() = unlocked && lockManager.isUnlocked
+
+    suspend fun unlockWithSessionKey() = withContext(Dispatchers.IO) {
+        val key = lockManager.requireSessionKey()
+        VaultMigration.migrateIfNeeded(application, key)
+        SecureDatabaseFactory.openNotes(application, key)
+        SecureDatabaseFactory.openCards(application, key)
+        val imgKey = VaultCrypto.imageKey(key)
+        imageStore = CardImageStore(application, imgKey)
+        imageStore.encryptExistingPlaintextImages()
+        repository = BudgetNoteRepository(
+            noteDao = AppDatabase.getInstance().budgetNoteDao(),
+            itemDao = AppDatabase.getInstance().budgetItemDao(),
+        )
+        cardRepository = CardRepository(
+            cardDao = CardsDatabase.getInstance().savedCardDao(),
+            fieldDao = CardsDatabase.getInstance().cardCustomFieldDao(),
+            imageStore = imageStore,
+        )
+        unlocked = true
+    }
+
+    fun lock() {
+        unlocked = false
+        lockManager.lock()
+        AppDatabase.closeAndClear()
+        CardsDatabase.closeAndClear()
+    }
 }

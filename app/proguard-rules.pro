@@ -6,6 +6,10 @@
 -keep @androidx.room.Entity class *
 -dontwarn androidx.room.paging.**
 
+# SQLCipher
+-keep class net.zetetic.** { *; }
+-dontwarn net.zetetic.**
+
 # Kotlin
 -dontwarn kotlin.**
 -keepclassmembers class **$WhenMappings {

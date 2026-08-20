@@ -37,3 +37,6 @@ keystore/
 
 # Optional local tooling
 .wrapper-gen/
+
+# Local adb UI dumps / device QA artifacts (may contain secrets)
+.adb-shots/

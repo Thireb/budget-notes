@@ -88,7 +88,7 @@ class CardEditorViewModel(
                 backImagePath = card.backImagePath,
                 labelDraft = card.label,
                 cardholderName = card.cardholderName,
-                cardNumber = PaymentCardParser.formatPanForDisplay(card.cardNumber),
+                cardNumber = card.cardNumber.filter { it.isDigit() },
                 expiryMonth = card.expiryMonth,
                 expiryYear = card.expiryYear,
                 cvv = card.cvv,
@@ -110,10 +110,10 @@ class CardEditorViewModel(
     fun onLabelChange(value: String) = edit { it.copy(labelDraft = value) }
     fun onCardholderNameChange(value: String) = edit { it.copy(cardholderName = value) }
     fun onCardNumberChange(value: String) = edit {
-        val cleaned = value.filter { ch -> ch.isDigit() || ch == ' ' }
+        val digits = value.filter { it.isDigit() }.take(19)
         it.copy(
-            cardNumber = cleaned,
-            brand = PaymentCardParser.detectBrand(cleaned).ifBlank { it.brand },
+            cardNumber = digits,
+            brand = PaymentCardParser.detectBrand(digits).ifBlank { it.brand },
         )
     }
 
@@ -248,7 +248,7 @@ class CardEditorViewModel(
         _uiState.update { current ->
             current.copy(
                 cardNumber = current.cardNumber.ifBlank {
-                    PaymentCardParser.formatPanForDisplay(parsed.cardNumber)
+                    parsed.cardNumber.filter { it.isDigit() }
                 },
                 cardholderName = current.cardholderName.ifBlank { parsed.cardholderName },
                 expiryMonth = current.expiryMonth.ifBlank { parsed.expiryMonth },

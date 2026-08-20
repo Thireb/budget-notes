@@ -13,6 +13,9 @@ interface SavedCardDao {
     @Query("SELECT * FROM saved_cards ORDER BY updatedAt DESC")
     fun observeAll(): Flow<List<SavedCard>>
 
+    @Query("SELECT * FROM saved_cards ORDER BY updatedAt DESC")
+    suspend fun getAllOnce(): List<SavedCard>
+
     @Query("SELECT * FROM saved_cards WHERE id = :id")
     fun observeById(id: Long): Flow<SavedCard?>
 

@@ -1,8 +1,6 @@
 package com.budgetnotes.app.ui.cards
 
 import android.Manifest
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -72,10 +70,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import com.budgetnotes.app.BudgetNotesApplication
 import com.budgetnotes.app.data.CardImageStore
 import com.budgetnotes.app.data.CardType
-import com.budgetnotes.app.ocr.PaymentCardParser
 import com.budgetnotes.app.ui.capture.InAppCardCamera
 import java.io.File
 import kotlinx.coroutines.flow.collectLatest
@@ -456,18 +453,14 @@ private fun CardImageSlot(
             contentAlignment = Alignment.Center,
         ) {
             if (relativePath != null) {
-                val request = rememberCardImageRequest(
-                    file = imageStore.absoluteFile(relativePath),
+                EncryptedCardImage(
+                    relativePath = relativePath,
+                    imageStore = imageStore,
+                    contentDescription = title,
+                    contentScale = ContentScale.Crop,
                     sizePx = sizePx,
+                    modifier = Modifier.fillMaxSize(),
                 )
-                if (request != null) {
-                    AsyncImage(
-                        model = request,
-                        contentDescription = title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.PhotoCamera, contentDescription = null)
@@ -490,10 +483,10 @@ private fun PaymentFields(
         value = state.cardNumber,
         onValueChange = viewModel::onCardNumberChange,
         keyboardType = KeyboardType.Number,
-        visualTransformation = if (state.revealSecrets || state.cardNumber.isBlank()) {
-            VisualTransformation.None
-        } else {
-            PanMaskTransformation
+        visualTransformation = when {
+            state.cardNumber.isBlank() -> VisualTransformation.None
+            state.revealSecrets -> PanGroupedTransformation(mask = false)
+            else -> PanGroupedTransformation(mask = true)
         },
         onCopy = {
             copyToClipboard(context, "Card number", state.cardNumber.filter { it.isDigit() })
@@ -702,27 +695,62 @@ private fun CopyableField(
     )
 }
 
-/** Shows only last 4 digits; keeps identity offset mapping for editing. */
-private object PanMaskTransformation : VisualTransformation {
+/**
+ * Shows the PAN in 4-digit groups. When [mask] is true every digit is '•'
+ * (•••• •••• •••• ••••); when false digits stay visible (4111 1111 …).
+ */
+private class PanGroupedTransformation(
+    private val mask: Boolean,
+) : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val digits = text.text.filter { it.isDigit() }
-        val masked = if (digits.length < 4) {
-            "••••"
-        } else {
-            PaymentCardParser.maskPan(digits)
+        val transformed = buildString(digits.length + digits.length / 4) {
+            digits.forEachIndexed { index, ch ->
+                if (index > 0 && index % 4 == 0) append(' ')
+                append(if (mask) '•' else ch)
+            }
         }
         return TransformedText(
-            AnnotatedString(masked),
-            object : OffsetMapping {
-                override fun originalToTransformed(offset: Int): Int = masked.length.coerceAtMost(offset)
-                override fun transformedToOriginal(offset: Int): Int = text.length.coerceAtMost(offset)
-            },
+            AnnotatedString(transformed),
+            PanGroupOffsetMapping(digits.length),
         )
+    }
+}
+
+/** Maps between digit-only original text and space-grouped transformed text. */
+private class PanGroupOffsetMapping(
+    private val digitCount: Int,
+) : OffsetMapping {
+    override fun originalToTransformed(offset: Int): Int {
+        val clamped = offset.coerceIn(0, digitCount)
+        if (clamped == 0) return 0
+        // Space is inserted before digits at indices 4, 8, 12… so first N digits
+        // contain (N - 1) / 4 spaces.
+        return clamped + (clamped - 1) / 4
+    }
+
+    override fun transformedToOriginal(offset: Int): Int {
+        if (offset <= 0) return 0
+        val maxTransformed = originalToTransformed(digitCount)
+        val clamped = offset.coerceIn(0, maxTransformed)
+        // Walk the same layout: 4 digits, space, 4 digits, space…
+        var digits = 0
+        var i = 0
+        while (i < clamped && digits < digitCount) {
+            if (digits > 0 && digits % 4 == 0) {
+                // This transformed index is a space — consume it without a digit.
+                i++
+                continue
+            }
+            digits++
+            i++
+        }
+        return digits
     }
 }
 
 private fun copyToClipboard(context: Context, label: String, value: String) {
     if (value.isBlank()) return
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
+    val app = context.applicationContext as BudgetNotesApplication
+    app.container.clipboard.copy(label, value)
 }

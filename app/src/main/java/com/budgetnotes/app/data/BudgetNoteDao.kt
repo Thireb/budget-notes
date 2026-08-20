@@ -13,6 +13,9 @@ interface BudgetNoteDao {
     @Query("SELECT * FROM budget_notes ORDER BY updatedAt DESC")
     fun observeAll(): Flow<List<BudgetNote>>
 
+    @Query("SELECT * FROM budget_notes ORDER BY updatedAt DESC")
+    suspend fun getAllOnce(): List<BudgetNote>
+
     @Query("SELECT * FROM budget_notes WHERE id = :id")
     fun observeById(id: Long): Flow<BudgetNote?>
 

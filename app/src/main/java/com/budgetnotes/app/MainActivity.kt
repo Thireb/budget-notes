@@ -1,23 +1,44 @@
 package com.budgetnotes.app
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentActivity
 import com.budgetnotes.app.navigation.BudgetNotesNavGraph
+import com.budgetnotes.app.ui.lock.VaultGate
 import com.budgetnotes.app.ui.theme.BudgetNotesTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Block screenshots and recents thumbnails of vault contents.
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE,
+        )
         enableEdgeToEdge()
         setContent {
             BudgetNotesTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    BudgetNotesNavGraph()
+                    val app = application as BudgetNotesApplication
+                    var unlocked by remember {
+                        mutableStateOf(app.container.isUnlocked)
+                    }
+                    if (!unlocked) {
+                        VaultGate(
+                            onUnlocked = { unlocked = true },
+                        )
+                    } else {
+                        BudgetNotesNavGraph()
+                    }
                 }
             }
         }

@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import com.budgetnotes.app.security.VaultCrypto
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.max
@@ -11,10 +13,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Stores card front/back JPEGs under app-private [Context.getFilesDir]/cards/{cardId}/.
- * Heavy I/O and decode work runs on [Dispatchers.IO].
+ * Card photos in app-private storage, encrypted at rest with AES-GCM.
+ * Never writes to the device gallery / MediaStore.
  */
-class CardImageStore(private val context: Context) {
+class CardImageStore(
+    private val context: Context,
+    private val imageKey: ByteArray,
+) {
 
     fun cardDir(cardId: Long): File {
         return File(context.filesDir, "cards/$cardId").also { it.mkdirs() }
@@ -24,9 +29,6 @@ class CardImageStore(private val context: Context) {
         return File(context.filesDir, relativePath)
     }
 
-    /**
-     * Decodes [uri], downsamples to [maxEdgePx], writes JPEG, returns path relative to filesDir.
-     */
     suspend fun saveFromUri(
         cardId: Long,
         side: ImageSide,
@@ -37,27 +39,9 @@ class CardImageStore(private val context: Context) {
         val bitmap = decodeUriDownsampled(uri, maxEdgePx)
             ?: error("Unable to read image")
         try {
-            writeJpeg(cardId, side, bitmap, quality)
+            writeEncryptedJpeg(cardId, side, bitmap, quality)
         } finally {
             if (!bitmap.isRecycled) bitmap.recycle()
-        }
-    }
-
-    suspend fun saveBitmap(
-        cardId: Long,
-        side: ImageSide,
-        bitmap: Bitmap,
-        quality: Int = 85,
-    ): String = withContext(Dispatchers.IO) {
-        writeJpeg(cardId, side, bitmap, quality)
-    }
-
-    fun createCameraTempFile(cardId: Long, side: ImageSide): File {
-        // App cache only — never MediaStore / DCIM / gallery.
-        val dir = File(context.cacheDir, "card_capture/$cardId").also { it.mkdirs() }
-        return File(dir, "${side.fileName}.tmp").also {
-            if (it.exists()) it.delete()
-            it.createNewFile()
         }
     }
 
@@ -68,46 +52,73 @@ class CardImageStore(private val context: Context) {
         maxEdgePx: Int = 1600,
         quality: Int = 85,
     ): String = withContext(Dispatchers.IO) {
-        val relative = relativePath(cardId, side)
-        val dest = absoluteFile(relative)
-        dest.parentFile?.mkdirs()
-        // Re-encode downsampled so gallery/camera full-res shots don't stay huge on disk.
         val decoded = decodeFileDownsampled(tempFile, maxEdgePx)
-        if (decoded != null) {
-            try {
-                FileOutputStream(dest).use { out ->
-                    decoded.compress(Bitmap.CompressFormat.JPEG, quality, out)
-                }
-            } finally {
-                if (!decoded.isRecycled) decoded.recycle()
-            }
-            tempFile.delete()
-        } else {
-            if (dest.exists()) dest.delete()
-            if (!tempFile.renameTo(dest)) {
-                tempFile.copyTo(dest, overwrite = true)
-                tempFile.delete()
-            }
+        tempFile.delete()
+        if (decoded == null) error("Unable to read camera capture")
+        try {
+            writeEncryptedJpeg(cardId, side, decoded, quality)
+        } finally {
+            if (!decoded.isRecycled) decoded.recycle()
         }
-        relative
+    }
+
+    fun createCameraTempFile(cardId: Long, side: ImageSide): File {
+        val dir = File(context.cacheDir, "card_capture/$cardId").also { it.mkdirs() }
+        return File(dir, "${side.fileName}.tmp").also {
+            if (it.exists()) it.delete()
+            it.createNewFile()
+        }
     }
 
     suspend fun deleteCardImages(cardId: Long) = withContext(Dispatchers.IO) {
         cardDir(cardId).deleteRecursively()
     }
 
-    /** Downsampled decode for OCR / preview; never loads full camera resolution. */
     suspend fun loadBitmap(
         relativePath: String?,
         maxEdgePx: Int = 1280,
     ): Bitmap? = withContext(Dispatchers.IO) {
+        val bytes = loadDecryptedBytes(relativePath) ?: return@withContext null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val sample = calculateInSampleSize(bounds.outWidth, bounds.outHeight, maxEdgePx)
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+    }
+
+    /** Decrypted JPEG bytes for Coil display. */
+    suspend fun loadDecryptedBytes(relativePath: String?): ByteArray? = withContext(Dispatchers.IO) {
         if (relativePath.isNullOrBlank()) return@withContext null
         val file = absoluteFile(relativePath)
         if (!file.exists()) return@withContext null
-        decodeFileDownsampled(file, maxEdgePx)
+        val blob = file.readBytes()
+        try {
+            VaultCrypto.decryptAesGcm(imageKey, blob)
+        } catch (_: Exception) {
+            // Legacy plaintext JPEG from before encryption — migrate in place.
+            if (looksLikeJpeg(blob)) {
+                val enc = VaultCrypto.encryptAesGcm(imageKey, blob)
+                file.writeBytes(enc)
+                blob
+            } else {
+                null
+            }
+        }
     }
 
-    private fun writeJpeg(
+    /** Encrypt any leftover plaintext JPEGs under files/cards/. */
+    suspend fun encryptExistingPlaintextImages() = withContext(Dispatchers.IO) {
+        val root = File(context.filesDir, "cards")
+        if (!root.isDirectory) return@withContext
+        root.walkTopDown().filter { it.isFile && it.name.endsWith(".jpg") }.forEach { file ->
+            val bytes = file.readBytes()
+            if (looksLikeJpeg(bytes)) {
+                file.writeBytes(VaultCrypto.encryptAesGcm(imageKey, bytes))
+            }
+        }
+    }
+
+    private fun writeEncryptedJpeg(
         cardId: Long,
         side: ImageSide,
         bitmap: Bitmap,
@@ -116,11 +127,19 @@ class CardImageStore(private val context: Context) {
         val relative = relativePath(cardId, side)
         val dest = absoluteFile(relative)
         dest.parentFile?.mkdirs()
-        FileOutputStream(dest).use { out ->
+        val jpeg = ByteArrayOutputStream().use { out ->
             bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+            out.toByteArray()
         }
+        val encrypted = VaultCrypto.encryptAesGcm(imageKey, jpeg)
+        FileOutputStream(dest).use { it.write(encrypted) }
+        // Remove legacy plaintext sibling if present
+        File(dest.parentFile, side.legacyFileName).delete()
         return relative
     }
+
+    private fun looksLikeJpeg(bytes: ByteArray): Boolean =
+        bytes.size >= 3 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte()
 
     private fun decodeUriDownsampled(uri: Uri, maxEdgePx: Int): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -159,8 +178,8 @@ class CardImageStore(private val context: Context) {
         return "cards/$cardId/${side.fileName}"
     }
 
-    enum class ImageSide(val fileName: String) {
-        FRONT("front.jpg"),
-        BACK("back.jpg"),
+    enum class ImageSide(val fileName: String, val legacyFileName: String) {
+        FRONT("front.jpg.enc", "front.jpg"),
+        BACK("back.jpg.enc", "back.jpg"),
     }
 }

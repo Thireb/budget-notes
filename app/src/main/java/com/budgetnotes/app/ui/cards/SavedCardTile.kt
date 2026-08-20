@@ -28,7 +28,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.budgetnotes.app.data.CardImageStore
 import com.budgetnotes.app.data.CardType
 import com.budgetnotes.app.data.SavedCard
@@ -70,21 +69,17 @@ fun SavedCardTile(
         Column(modifier = Modifier.padding(12.dp)) {
             val frontPath = card.frontImagePath
             if (frontPath != null) {
-                val request = rememberCardImageRequest(
-                    file = imageStore.absoluteFile(frontPath),
+                EncryptedCardImage(
+                    relativePath = frontPath,
+                    imageStore = imageStore,
+                    contentDescription = "Card front",
+                    contentScale = ContentScale.Crop,
                     sizePx = thumbPx,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1.6f)
+                        .clip(RoundedCornerShape(8.dp)),
                 )
-                if (request != null) {
-                    AsyncImage(
-                        model = request,
-                        contentDescription = "Card front",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1.6f)
-                            .clip(RoundedCornerShape(8.dp)),
-                    )
-                }
             } else {
                 Box(
                     modifier = Modifier

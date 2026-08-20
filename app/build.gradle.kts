@@ -114,6 +114,12 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraVersion")
     implementation("androidx.camera:camera-view:$cameraVersion")
 
+    implementation("net.zetetic:sqlcipher-android:4.6.1@aar")
+    implementation("androidx.sqlite:sqlite:2.4.0")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 

@@ -8,6 +8,7 @@ class BudgetNotesApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Databases stay closed until PIN/biometric unlock.
         container = AppContainer(this)
     }
 }

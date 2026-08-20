@@ -1,20 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="database" path="budget_notes.db" />
-        <include domain="sharedpref" />
-        <exclude domain="database" path="cards.db" />
-        <exclude domain="database" path="cards.db-shm" />
-        <exclude domain="database" path="cards.db-wal" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
         <exclude domain="file" path="cards" />
     </cloud-backup>
     <device-transfer>
-        <!-- Device-to-device transfer may include notes; still exclude card secrets. -->
-        <include domain="database" path="budget_notes.db" />
-        <include domain="sharedpref" />
-        <exclude domain="database" path="cards.db" />
-        <exclude domain="database" path="cards.db-shm" />
-        <exclude domain="database" path="cards.db-wal" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
         <exclude domain="file" path="cards" />
     </device-transfer>
 </data-extraction-rules>

@@ -1,10 +1,10 @@
 # Budget Notes
 
-Private, local-only budget note-taking and card vault for Android (Kotlin, Jetpack Compose, Material 3, Room).
+Private, local-only budget notes and card vault for Android (Kotlin, Jetpack Compose, Material 3, Room + SQLCipher).
 
-No accounts, no network — budget notes track Add / Deduct line items and a live total. The **Cards** tab stores payment and ID cards (front/back photos, on-device OCR for payment fields, custom ID fields, copy-to-clipboard for online checkout).
+No accounts, no network. Data is gated by **fingerprint / device lock** (app PIN only if the phone has neither), encrypted at rest, and removed on uninstall.
 
-See [docs/SPEC_CARDS.md](docs/SPEC_CARDS.md) for the cards vault specification. Encryption / app lock is planned as a follow-up.
+See [docs/SPEC_CARDS.md](docs/SPEC_CARDS.md) and [docs/SPEC_SECURITY.md](docs/SPEC_SECURITY.md).
 
 ## Requirements
 
@@ -22,10 +22,12 @@ export ANDROID_HOME=$HOME/Android/Sdk
 Debug APK: `app/build/outputs/apk/debug/app-debug.apk`  
 (Package id: `com.budgetnotes.app.debug`)
 
-## Privacy notes
+## Privacy / security
 
-- All data stays in app-private storage and is removed when the app is uninstalled.
-- `cards.db` and card photos are excluded from Android cloud backup (PAN/CVV are sensitive; full encryption is Phase 2).
+- SQLCipher encryption for notes and cards databases (Keystore-wrapped key; PIN fallback when needed)
+- Card photos encrypted (AES-GCM) in app-private storage; in-app camera (not gallery)
+- Screenshots blocked (`FLAG_SECURE`); copied card fields clear from clipboard after ~45s
+- Android Backup disabled for vault data
 
 ## Play Store
 
