@@ -1,0 +1,1 @@
+Initial release: encrypted notes and cards vault, biometric unlock, expiry warnings, checkout copy helper.

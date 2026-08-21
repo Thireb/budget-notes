@@ -33,6 +33,18 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 
 See [docs/PLAY_STORE.md](docs/PLAY_STORE.md) for upload keystore setup and `bundleRelease`.
 
+## IzzyOnDroid / FOSS release
+
+See [docs/SPEC_IZZYONDROID.md](docs/SPEC_IZZYONDROID.md) for the inclusion checklist.
+
+```bash
+./gradlew clean assembleRelease
+# Signed when keystore.properties is present:
+# app/build/outputs/apk/release/app-release.apk
+```
+
+Store listing text lives in `fastlane/metadata/android/en-US/`.
+
 ## License
 
-Add a license before publishing if desired.
+[Apache License 2.0](LICENSE)

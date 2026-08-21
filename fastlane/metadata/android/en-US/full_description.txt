@@ -1,0 +1,12 @@
+Budget Notes is a private, local-only Android app for budget notes and a personal card vault.
+
+• Notes with Add / Deduct line items and a live total
+• Cards tab for payment and ID cards with front/back photos
+• Fingerprint / device lock (or app PIN if needed)
+• Databases and card photos encrypted on device
+• Copy card fields for checkout; clipboard clears automatically
+• No accounts and no network permission — data stays on your phone
+
+Photos are stored only inside the app (not in your gallery). Card numbers and other fields are entered manually.
+
+Open source. Uninstalling the app removes all data.
