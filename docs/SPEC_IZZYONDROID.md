@@ -30,7 +30,7 @@ Publish Budget Notes on **IzzyOnDroid** so users can install/update a signed FOS
 
 1. [x] Add `LICENSE` (Apache-2.0) + README license line
 2. [ ] Make GitHub repo **public** (or Codeberg)
-3. [ ] Create release keystore (`docs/PLAY_STORE.md` / keystore.properties)
+3. [x] Create release keystore (`keystore/` + `keystore.properties`, gitignored)
 4. [x] Shrink release APK (minify + phone ABI filters) — unsigned ~24 MB before ABI cut
 5. [x] Add Fastlane under `fastlane/metadata/android/en-US/`
 6. [x] Add 2–4 phone screenshots into Fastlane (captured via wireless adb debug build)
@@ -42,6 +42,6 @@ Publish Budget Notes on **IzzyOnDroid** so users can install/update a signed FOS
 - [x] Licensed in repo (Apache-2.0)
 - [x] Fastlane text + icon path present
 - [x] Screenshots present
-- [ ] Signed release APK on a git tag, size ≤ ~30 MB
+- [ ] Signed release APK on a git tag, size ≤ ~30 MB (local APK ready in dist/)
 - [ ] Inclusion issue filed
 - [ ] Repo is public
