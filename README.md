@@ -25,7 +25,7 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 ## Privacy / security
 
 - SQLCipher encryption for notes and cards databases (Keystore-wrapped key; PIN fallback when needed)
-- Card photos encrypted (AES-GCM) in app-private storage; in-app camera (not gallery)
+- Card photos encrypted (AES-GCM) in app-private storage; in-app camera (fields entered manually — no OCR)
 - Screenshots blocked (`FLAG_SECURE`); copied card fields clear from clipboard after ~45s
 - Android Backup disabled for vault data
 

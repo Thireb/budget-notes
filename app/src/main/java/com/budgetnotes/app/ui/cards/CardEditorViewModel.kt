@@ -1,16 +1,13 @@
 package com.budgetnotes.app.ui.cards
 
-import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.budgetnotes.app.data.CardCustomField
 import com.budgetnotes.app.data.CardImageStore
-import com.budgetnotes.app.ocr.CardOcrHelper
-import com.budgetnotes.app.ocr.ParsedPaymentFields
-import com.budgetnotes.app.ocr.PaymentCardParser
 import com.budgetnotes.app.repository.CardRepository
+import com.budgetnotes.app.util.PaymentCardFormat
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -43,7 +40,6 @@ data class CardEditorUiState(
     val issuer: String = "",
     val expiryDate: String = "",
     val revealSecrets: Boolean = false,
-    val isOcrRunning: Boolean = false,
     val loaded: Boolean = false,
     val missing: Boolean = false,
 )
@@ -58,7 +54,6 @@ class CardEditorViewModel(
     private val cardId: Long,
     private val repository: CardRepository,
     private val imageStore: CardImageStore,
-    private val ocrHelper: CardOcrHelper,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CardEditorUiState())
@@ -113,7 +108,7 @@ class CardEditorViewModel(
         val digits = value.filter { it.isDigit() }.take(19)
         it.copy(
             cardNumber = digits,
-            brand = PaymentCardParser.detectBrand(digits).ifBlank { it.brand },
+            brand = PaymentCardFormat.detectBrand(digits).ifBlank { it.brand },
         )
     }
 
@@ -178,38 +173,23 @@ class CardEditorViewModel(
         return imageStore.createCameraTempFile(cardId, side)
     }
 
-    fun onImagePicked(side: CardImageStore.ImageSide, uri: Uri, runOcr: Boolean) {
+    fun onImagePicked(side: CardImageStore.ImageSide, uri: Uri) {
         viewModelScope.launch {
             try {
                 val path = imageStore.saveFromUri(cardId, side, uri)
                 applyImagePath(side, path)
-                if (runOcr) runOcrOnUri(uri, side)
             } catch (_: Exception) {
                 _events.emit(CardEditorEvent.Message("Could not save image"))
             }
         }
     }
 
-    fun onCameraCaptured(side: CardImageStore.ImageSide, tempFile: File, runOcr: Boolean) {
+    fun onCameraCaptured(side: CardImageStore.ImageSide, tempFile: File) {
         viewModelScope.launch {
             try {
                 val path = imageStore.finalizeCameraCapture(cardId, side, tempFile)
                 applyImagePath(side, path)
-                if (runOcr) {
-                    _uiState.update { it.copy(isOcrRunning = true) }
-                    val bitmap = imageStore.loadBitmap(path)
-                    if (bitmap != null) {
-                        try {
-                            val parsed = ocrHelper.parsePaymentFromBitmap(bitmap)
-                            applyParsedFields(parsed, preferCvv = side == CardImageStore.ImageSide.BACK)
-                        } finally {
-                            if (!bitmap.isRecycled) bitmap.recycle()
-                        }
-                    }
-                    _uiState.update { it.copy(isOcrRunning = false) }
-                }
             } catch (_: Exception) {
-                _uiState.update { it.copy(isOcrRunning = false) }
                 _events.emit(CardEditorEvent.Message("Could not save photo"))
             }
         }
@@ -230,51 +210,6 @@ class CardEditorViewModel(
                 CardImageStore.ImageSide.BACK -> it.copy(backImagePath = path)
             }
         }
-    }
-
-    private suspend fun runOcrOnUri(uri: Uri, side: CardImageStore.ImageSide) {
-        _uiState.update { it.copy(isOcrRunning = true) }
-        try {
-            val parsed = ocrHelper.parsePaymentFromUri(uri)
-            applyParsedFields(parsed, preferCvv = side == CardImageStore.ImageSide.BACK)
-        } catch (_: Exception) {
-            _events.emit(CardEditorEvent.Message("OCR failed — enter fields manually"))
-        } finally {
-            _uiState.update { it.copy(isOcrRunning = false) }
-        }
-    }
-
-    private fun applyParsedFields(parsed: ParsedPaymentFields, preferCvv: Boolean) {
-        _uiState.update { current ->
-            current.copy(
-                cardNumber = current.cardNumber.ifBlank {
-                    parsed.cardNumber.filter { it.isDigit() }
-                },
-                cardholderName = current.cardholderName.ifBlank { parsed.cardholderName },
-                expiryMonth = current.expiryMonth.ifBlank { parsed.expiryMonth },
-                expiryYear = current.expiryYear.ifBlank { parsed.expiryYear },
-                brand = current.brand.ifBlank { parsed.brand },
-                cvv = when {
-                    current.cvv.isNotBlank() -> current.cvv
-                    preferCvv && parsed.cvv.isNotBlank() -> parsed.cvv
-                    parsed.cvv.isNotBlank() -> parsed.cvv
-                    else -> current.cvv
-                },
-                fullName = current.fullName.ifBlank { parsed.cardholderName },
-            )
-        }
-        scheduleSave()
-        val filled = listOf(
-            parsed.cardNumber.isNotBlank(),
-            parsed.expiryMonth.isNotBlank(),
-            parsed.cardholderName.isNotBlank(),
-            parsed.cvv.isNotBlank(),
-        ).count { it }
-        _events.tryEmit(
-            CardEditorEvent.Message(
-                if (filled > 0) "Filled $filled field(s) from scan" else "No card fields detected",
-            ),
-        )
     }
 
     private fun scheduleSave() {
@@ -313,7 +248,6 @@ class CardEditorViewModel(
         private val cardId: Long,
         private val repository: CardRepository,
         private val imageStore: CardImageStore,
-        private val ocrHelper: CardOcrHelper,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -321,7 +255,6 @@ class CardEditorViewModel(
                 cardId = cardId,
                 repository = repository,
                 imageStore = imageStore,
-                ocrHelper = ocrHelper,
             ) as T
         }
     }

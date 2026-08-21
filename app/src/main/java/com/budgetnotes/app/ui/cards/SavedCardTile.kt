@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.budgetnotes.app.data.CardImageStore
 import com.budgetnotes.app.data.CardType
 import com.budgetnotes.app.data.SavedCard
-import com.budgetnotes.app.ocr.PaymentCardParser
+import com.budgetnotes.app.util.PaymentCardFormat
 import com.budgetnotes.app.ui.theme.RedNegative
 import com.budgetnotes.app.util.CardExpiry
 import com.budgetnotes.app.util.ExpiryStatus
@@ -59,7 +59,7 @@ fun SavedCardTile(
 
     val subtitle = when (card.type) {
         CardType.PAYMENT -> {
-            val masked = PaymentCardParser.maskPan(card.cardNumber)
+            val masked = PaymentCardFormat.maskPan(card.cardNumber)
             listOfNotNull(
                 card.brand.takeIf { it.isNotBlank() },
                 masked.takeIf { card.cardNumber.isNotBlank() },

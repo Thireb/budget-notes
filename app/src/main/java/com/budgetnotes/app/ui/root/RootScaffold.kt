@@ -121,13 +121,11 @@ fun RootScaffold(
             val app = LocalContext.current.applicationContext as BudgetNotesApplication
             val cardRepository = remember { app.container.cardRepository }
             val imageStore = remember { app.container.imageStore }
-            val ocrHelper = remember { app.container.ocrHelper }
             val vm: CardEditorViewModel = viewModel(
                 factory = CardEditorViewModel.Factory(
                     cardId = cardId,
                     repository = cardRepository,
                     imageStore = imageStore,
-                    ocrHelper = ocrHelper,
                 ),
             )
             CardEditorScreen(

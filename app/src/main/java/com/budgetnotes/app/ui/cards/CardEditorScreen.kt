@@ -112,7 +112,6 @@ fun CardEditorScreen(
     var checkoutJob by remember { mutableStateOf<Job?>(null) }
 
     val cardType = state.cardType
-    val runOcr = cardType == CardType.PAYMENT || cardType == CardType.ID
     val imageStore = rememberImageStore(context)
 
     DisposableEffect(Unit) {
@@ -131,7 +130,7 @@ fun CardEditorScreen(
         val side = imagePickSide
         // Copies into app-private storage only — does not write back to the gallery.
         if (uri != null && side != null) {
-            viewModel.onImagePicked(side, uri, runOcr = runOcr)
+            viewModel.onImagePicked(side, uri)
         }
         imagePickSide = null
     }
@@ -176,7 +175,7 @@ fun CardEditorScreen(
                     showInAppCamera = false
                     cameraOutputFile = null
                     imagePickSide = null
-                    viewModel.onCameraCaptured(side, file, runOcr = runOcr)
+                    viewModel.onCameraCaptured(side, file)
                 },
                 onCancel = {
                     showInAppCamera = false
@@ -299,16 +298,6 @@ fun CardEditorScreen(
                                 showImageSourceDialog = true
                             },
                         )
-                    }
-
-                    if (state.isOcrRunning) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Text("Reading card…")
-                        }
                     }
 
                     when (cardType) {

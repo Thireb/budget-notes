@@ -3,7 +3,6 @@ package com.budgetnotes.app
 import com.budgetnotes.app.data.AppDatabase
 import com.budgetnotes.app.data.CardImageStore
 import com.budgetnotes.app.data.CardsDatabase
-import com.budgetnotes.app.ocr.CardOcrHelper
 import com.budgetnotes.app.repository.BudgetNoteRepository
 import com.budgetnotes.app.repository.CardRepository
 import com.budgetnotes.app.security.SecureClipboard
@@ -17,7 +16,6 @@ import kotlinx.coroutines.withContext
 class AppContainer(private val application: BudgetNotesApplication) {
     val lockManager = VaultLockManager(application)
     val clipboard = SecureClipboard(application)
-    val ocrHelper = CardOcrHelper(application)
 
     @Volatile
     private var unlocked = false
