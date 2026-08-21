@@ -6,6 +6,18 @@ No accounts, no network. Data is gated by **fingerprint / device lock** (app PIN
 
 See [docs/SPEC_CARDS.md](docs/SPEC_CARDS.md) and [docs/SPEC_SECURITY.md](docs/SPEC_SECURITY.md).
 
+## Install (Android)
+
+**Recommended:** [Obtainium](https://github.com/ImranR98/Obtainium) → Add App →  
+`https://github.com/Thireb/budget-notes`
+
+Or download the APK from [Releases](https://github.com/Thireb/budget-notes/releases/latest).
+
+Signing cert SHA-256: `6760d8e3e55ab260d99f94c277a5b2eea88c53cded995973c1e38f52417ff2ad`  
+Package: `com.budgetnotes.app`
+
+Full steps: [docs/OBTAINIUM.md](docs/OBTAINIUM.md).
+
 ## Requirements
 
 - JDK 17+ (21 recommended)
@@ -33,17 +45,18 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 
 See [docs/PLAY_STORE.md](docs/PLAY_STORE.md) for upload keystore setup and `bundleRelease`.
 
-## IzzyOnDroid / FOSS release
+## FOSS release (GitHub + Obtainium)
 
-See [docs/SPEC_IZZYONDROID.md](docs/SPEC_IZZYONDROID.md) for the inclusion checklist.
+IzzyOnDroid declined inclusion ([AI policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/)). Distribution: **GitHub Releases** + [Obtainium](docs/OBTAINIUM.md). Historical checklist: [docs/SPEC_IZZYONDROID.md](docs/SPEC_IZZYONDROID.md).
 
 ```bash
 ./gradlew clean assembleRelease
 # Signed when keystore.properties is present:
 # app/build/outputs/apk/release/app-release.apk
+# Attach to a GitHub Release as BudgetNotes-<version>.apk
 ```
 
-Store listing text lives in `fastlane/metadata/android/en-US/`.
+Store listing text (for Play later) lives in `fastlane/metadata/android/en-US/`.
 
 ## License
 
